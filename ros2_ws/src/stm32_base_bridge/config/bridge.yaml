@@ -1,0 +1,19 @@
+stm32_base_bridge:
+  ros__parameters:
+    port: /dev/ttyUSB0
+    baud: 115200
+    linear_scale: 1000.0
+    angular_scale: 1000.0
+    max_command: 900
+    cmd_vel_timeout: 0.4
+    command_rate: 10.0
+    reconnect_interval: 2.0
+
+    # Placeholder geometry values. Calibrate before using odometry for navigation.
+    wheel_radius: 0.05
+    wheel_separation: 0.30
+    encoder_counts_per_rev: 1560.0
+    publish_tf: true
+    odom_frame: odom
+    base_frame: base_link
+

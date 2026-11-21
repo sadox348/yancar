@@ -1,0 +1,13 @@
+<launch>
+  <arg name="port" default="/dev/ttyUSB0"/>
+  <arg name="config" default="$(find stm32_base_bridge)/config/bridge.yaml"/>
+
+  <node pkg="stm32_base_bridge"
+        type="cmdvel_serial_bridge.py"
+        name="stm32_base_bridge"
+        output="screen">
+    <rosparam command="load" file="$(arg config)"/>
+    <param name="port" value="$(arg port)"/>
+  </node>
+</launch>
+
