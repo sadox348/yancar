@@ -30,6 +30,11 @@ inline double normalize_angle(double angle)
   return std::atan2(std::sin(angle), std::cos(angle));
 }
 
+inline bool is_finite_goal(double x, double y)
+{
+  return std::isfinite(x) && std::isfinite(y);
+}
+
 inline Command compute_command(
   double x, double y, double yaw, double target_x, double target_y, const Limits & limits)
 {

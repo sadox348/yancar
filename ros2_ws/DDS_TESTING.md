@@ -48,14 +48,24 @@ ros2 topic hz /odom
 ros2 topic echo /agv_task/state
 ```
 
+The controller must remain stopped after launch. Send a valid goal explicitly:
+
+```bash
+ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: odom}, pose: {position: {x: 0.5, y: 0.0}, orientation: {w: 1.0}}}"
+```
+
 Expected results:
 
 - `/cmd_vel` has the C++ publisher and Python bridge subscriber.
 - `/odom` has the bridge publisher and C++ controller subscriber.
 - Both endpoints report `RELIABLE` and `VOLATILE`; command depth is 1 and
   odometry depth is 10.
-- Controller states progress through `WAITING_FOR_ODOM`, `ROTATING` or
+- Before a goal is sent, the controller reports `WAITING_FOR_GOAL` and publishes
+  only zero velocity commands.
+- After a valid goal, states progress through `WAITING_FOR_ODOM`, `ROTATING` or
   `DRIVING`, and finally `GOAL_REACHED`.
+- Goals with a missing/non-`odom` frame or non-finite coordinates are rejected.
 - Stopping the bridge causes `ODOM_TIMEOUT` and zero `/cmd_vel` output.
 
 ## Two-host DDS v3 test

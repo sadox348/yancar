@@ -1,4 +1,5 @@
 #include <cmath>
+#include <limits>
 
 #include "gtest/gtest.h"
 
@@ -7,6 +8,7 @@
 using agv_task_controller::Limits;
 using agv_task_controller::MotionState;
 using agv_task_controller::compute_command;
+using agv_task_controller::is_finite_goal;
 
 TEST(ControllerCore, StopsInsideGoalTolerance)
 {
@@ -37,4 +39,11 @@ TEST(ControllerCore, UsesShortestHeadingErrorAcrossPi)
   const auto command = compute_command(0.0, 0.0, -3.13, -1.0, 0.0, Limits{});
   EXPECT_EQ(command.state, MotionState::drive);
   EXPECT_LT(std::abs(command.angular), 0.1);
+}
+
+TEST(ControllerCore, RejectsNonFiniteGoalCoordinates)
+{
+  EXPECT_TRUE(is_finite_goal(1.0, -2.0));
+  EXPECT_FALSE(is_finite_goal(std::numeric_limits<double>::infinity(), 0.0));
+  EXPECT_FALSE(is_finite_goal(0.0, std::numeric_limits<double>::quiet_NaN()));
 }

@@ -1,7 +1,7 @@
 agv_task_controller:
   ros__parameters:
-    target_x: 1.0
-    target_y: 0.0
+    # Goals are rejected unless their PoseStamped header uses this frame.
+    goal_frame: odom
     control_rate: 10.0
     odom_timeout: 0.5
     max_linear: 0.25

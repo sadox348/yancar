@@ -14,7 +14,8 @@ ROS 1 and ROS 2 bridge nodes.
 - TIM2/TIM4 encoder inputs for left and right wheel feedback.
 - Signed forward, reverse and stop control for both motors.
 - Differential command mixing from `V,<linear>,<angular>`.
-- 100 ms dual-wheel speed loop with feed-forward and PID correction.
+- 100 ms dual-wheel speed loop with feed-forward and proportional correction
+  (`KI` and `KD` are currently zero).
 - Minimum start PWM, output saturation and direction compensation.
 - 500 ms base-command timeout with immediate motor stop.
 - `ACK`, `STAT`, `EVT`, `ERR` and `VER` response frames.
@@ -37,6 +38,20 @@ STAT,<enabled>,<left_target>,<left_actual>,<left_pwm>,
 The command values are scaled controller inputs rather than calibrated SI
 units. Wheel radius, separation, encoder counts per revolution and command
 scales must be calibrated before using odometry for navigation.
+
+### PWM timing
+
+The current generated clock tree runs directly from the 16 MHz HSI with PLL
+disabled and APB1 prescaler set to 1. TIM3 is configured with prescaler 83 and
+period 999:
+
+```text
+f_pwm = 16 MHz / (83 + 1) / (999 + 1) = 190.48 Hz
+```
+
+This documents the checked-in configuration; the project does not claim a
+1 kHz PWM output. Any frequency change must be followed by motor response and
+wheel-controller retuning tests on the physical base.
 
 ### Deferred
 

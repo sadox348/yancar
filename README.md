@@ -112,7 +112,9 @@ Start the bridge and C++ task controller together:
 ros2 launch agv_task_controller agv_system.launch.py port:=/dev/ttyUSB0
 ```
 
-The default target is `(1.0, 0.0)` metres. A new target can be sent at runtime:
+The controller always starts stopped in `WAITING_FOR_GOAL`. It moves only after
+receiving a finite `/goal_pose` whose `frame_id` matches the configured `odom`
+frame:
 
 ```bash
 ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped \
@@ -122,8 +124,9 @@ ros2 topic echo /agv_task/state
 
 The controller rotates toward the target, drives with bounded linear/angular
 velocity, stops inside the configured tolerance and sends a zero command if
-odometry becomes stale. Its gains, limits, goal and timeouts are in
-`agv_task_controller/config/controller.yaml`.
+odometry becomes stale. Goals in another frame (for example `map`) are rejected
+until a TF2 conversion layer is added. Its gains, limits, goal frame and
+timeouts are in `agv_task_controller/config/controller.yaml`.
 
 Configuration is in `config/bridge.yaml`. Important parameters:
 
@@ -147,6 +150,20 @@ The midpoint heading is used for planar pose integration. Because the geometry
 defaults are uncalibrated, `/odom` demonstrates the software data flow rather
 than measured positioning accuracy.
 
+## Firmware timing
+
+The checked-in clock configuration uses the 16 MHz HSI directly, with no PLL
+and APB1 divided by 1. TIM3 uses prescaler 83 and auto-reload period 999, so the
+current motor PWM frequency is:
+
+```text
+16,000,000 / (83 + 1) / (999 + 1) = 190.48 Hz
+```
+
+This is the value calculated from the checked-in configuration, not 1 kHz.
+Changing it requires hardware validation because PWM frequency affects motor
+noise, low-speed response and the controller's feed-forward tuning.
+
 ## Static tests
 
 The protocol and odometry modules have no ROS dependency:
@@ -159,7 +176,8 @@ python3 -m unittest discover -s test -v
 Tests cover integer command scaling and clamping, malformed telemetry, straight
 motion, in-place rotation, single-wheel arcs and zero encoder motion.
 The C++ package also contains tests for goal tolerance, rotate-before-drive,
-velocity limiting and angle wraparound; run all ROS 2 tests with:
+velocity limiting, angle wraparound and non-finite goal rejection; run all ROS
+2 tests with:
 
 ```bash
 cd ros2_ws
