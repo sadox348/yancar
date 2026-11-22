@@ -14,9 +14,12 @@ encoder parameters are placeholders that must be measured before navigation.
 ## Architecture
 
 ```text
-                     ROS 1 Noetic / ROS 2 Humble
-                                |
-                     geometry_msgs/Twist (/cmd_vel)
+              ROS 2 C++ task controller (rclcpp)
+              /goal_pose -> state machine -> /cmd_vel
+                     | DDS + explicit QoS |
+                     v                      ^
+              ROS 2 Python serial bridge (rclpy)
+              /cmd_vel -> UART; /odom -> controller
                                 |
                        integer UART command
                          V,<linear>,<angular>
@@ -25,7 +28,7 @@ encoder parameters are placeholders that must be measured before navigation.
        | STM32F407                                       |
        | TIM3 PWM -> motor driver -> left/right motors   |
        | TIM2/TIM4 <- left/right wheel encoders          |
-       | 100 ms feed-forward + PID wheel-speed loop      |
+       | 100 ms feed-forward + proportional speed loop   |
        | 500 ms command watchdog                         |
        +--------------------------------------------------+
                                 |
@@ -37,10 +40,11 @@ encoder parameters are placeholders that must be measured before navigation.
 ## Repository layout
 
 ```text
-firmware/stm32f407_base/       STM32CubeMX/CMake firmware
-ros1_ws/src/stm32_base_bridge ROS 1 Noetic rospy bridge
-ros2_ws/src/stm32_base_bridge ROS 2 Humble rclpy bridge and odometry
-reference/                    upstream project references only
+firmware/stm32f407_base/          STM32CubeMX/CMake firmware
+ros1_ws/src/stm32_base_bridge    ROS 1 Noetic rospy bridge
+ros2_ws/src/stm32_base_bridge    ROS 2 Humble rclpy bridge and odometry
+ros2_ws/src/agv_task_controller ROS 2 Humble rclcpp point-goal controller
+reference/                       upstream project references only
 ```
 
 ## UART protocol
@@ -76,6 +80,9 @@ Other responses include `ACK`, `EVT`, `ERR` and `VER`. Both bridges convert a
 | Publish (ROS 2) | `/stm32/connected` | `std_msgs/Bool` |
 | Publish (ROS 2) | `/odom` | `nav_msgs/Odometry` |
 | Broadcast (ROS 2) | `odom -> base_link` | TF |
+| Subscribe (ROS 2 C++) | `/goal_pose` | `geometry_msgs/PoseStamped` |
+| Publish (ROS 2 C++) | `/cmd_vel` | `geometry_msgs/Twist` |
+| Publish (ROS 2 C++) | `/agv_task/state` | `std_msgs/String` |
 
 ## ROS 1 Noetic
 
@@ -98,6 +105,25 @@ colcon build --symlink-install
 source install/setup.bash
 ros2 launch stm32_base_bridge stm32_base_bridge.launch.py port:=/dev/ttyUSB0
 ```
+
+Start the bridge and C++ task controller together:
+
+```bash
+ros2 launch agv_task_controller agv_system.launch.py port:=/dev/ttyUSB0
+```
+
+The default target is `(1.0, 0.0)` metres. A new target can be sent at runtime:
+
+```bash
+ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: odom}, pose: {position: {x: 0.5, y: 0.5}, orientation: {w: 1.0}}}"
+ros2 topic echo /agv_task/state
+```
+
+The controller rotates toward the target, drives with bounded linear/angular
+velocity, stops inside the configured tolerance and sends a zero command if
+odometry becomes stale. Its gains, limits, goal and timeouts are in
+`agv_task_controller/config/controller.yaml`.
 
 Configuration is in `config/bridge.yaml`. Important parameters:
 
@@ -132,6 +158,26 @@ python3 -m unittest discover -s test -v
 
 Tests cover integer command scaling and clamping, malformed telemetry, straight
 motion, in-place rotation, single-wheel arcs and zero encoder motion.
+The C++ package also contains tests for goal tolerance, rotate-before-drive,
+velocity limiting and angle wraparound; run all ROS 2 tests with:
+
+```bash
+cd ros2_ws
+colcon build --symlink-install
+colcon test --event-handlers console_direct+
+colcon test-result --verbose
+```
+
+## DDS and QoS
+
+The ROS 2 nodes communicate through the selected RMW/DDS implementation; DDS
+does not run over the STM32 UART link. The command path explicitly uses
+`Reliable + Keep Last(1) + Volatile`, while odometry uses
+`Reliable + Keep Last(10) + Volatile`. This makes the intended compatibility
+visible in code rather than relying on ROS 2 defaults.
+
+See [`ros2_ws/DDS_TESTING.md`](ros2_ws/DDS_TESTING.md) for QoS inspection,
+Fast DDS selection and a two-computer discovery/communication test.
 
 ## Resume summary
 
@@ -144,6 +190,9 @@ motion, in-place rotation, single-wheel arcs and zero encoder motion.
   feedback topics.
 - Added differential-drive odometry and `odom -> base_link` TF publication to
   the ROS 2 migration, with configurable wheel geometry and encoder resolution.
+- Implemented an ROS 2 C++ point-goal task controller with explicit DDS QoS,
+  motion-state transitions, velocity limits, goal stopping and stale-odometry
+  fail-safe behavior.
 
 ## Attribution
 

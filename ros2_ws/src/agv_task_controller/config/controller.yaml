@@ -1,0 +1,12 @@
+agv_task_controller:
+  ros__parameters:
+    target_x: 1.0
+    target_y: 0.0
+    control_rate: 10.0
+    odom_timeout: 0.5
+    max_linear: 0.25
+    max_angular: 0.8
+    linear_gain: 0.8
+    angular_gain: 1.8
+    distance_tolerance: 0.05
+    heading_tolerance: 0.15

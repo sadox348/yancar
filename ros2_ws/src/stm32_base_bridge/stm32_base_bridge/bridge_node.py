@@ -9,6 +9,7 @@ import serial
 from geometry_msgs.msg import TransformStamped, Twist
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Bool, Int32MultiArray, String
 from tf2_ros import TransformBroadcaster
 
@@ -79,10 +80,22 @@ class Stm32BaseBridge(Node):
         self.target_pub = self.create_publisher(
             Int32MultiArray, "/wheel_target_delta", 20)
         self.pwm_pub = self.create_publisher(Int32MultiArray, "/wheel_pwm", 20)
-        self.odom_pub = self.create_publisher(Odometry, "/odom", 20)
+        cmd_vel_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+        )
+        odom_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+        )
+        self.odom_pub = self.create_publisher(Odometry, "/odom", odom_qos)
         self.tf_broadcaster = TransformBroadcaster(self) if self.publish_tf else None
         self.cmd_sub = self.create_subscription(
-            Twist, "/cmd_vel", self._cmd_vel_callback, 10)
+            Twist, "/cmd_vel", self._cmd_vel_callback, cmd_vel_qos)
 
         self.command_timer = self.create_timer(1.0 / command_rate, self._command_tick)
         self.reconnect_timer = self.create_timer(
